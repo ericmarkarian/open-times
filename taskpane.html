@@ -38,7 +38,7 @@ button { cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
 .verdict { font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -.02em; }
 .verdict.ok { color: var(--free-ink); } .verdict.bad { color: var(--err); } .verdict.neutral { color: var(--muted); }
 .hit-row { background: var(--err-soft); color: var(--err); border-radius: 8px; padding: 6px 10px; overflow-wrap: anywhere; }
-.suggest-text { padding: 10px 12px; border-radius: 8px; background: var(--track); overflow-wrap: anywhere; }
+.suggest-text { white-space: pre-wrap; padding: 10px 12px; border-radius: 8px; background: var(--track); overflow-wrap: anywhere; }
 .note { background: var(--track); border-radius: 8px; padding: 8px 10px; font-size: 13px; overflow-wrap: anywhere; }
 .notice { background: var(--err-soft); color: var(--err); border-radius: 10px; padding: 12px; display: grid; gap: 6px; overflow-wrap: anywhere; }
 .slots { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -354,18 +354,43 @@ function checkRequest(req, evs, st, nowMs) {
   return out;
 }
 
-function replyText(req, r, nowMs) {
-  const dw = dayWord(req.ds, nowMs);
-  const altWords = r.alts.slice(0, 3).map(a => dayWord(a.ds, nowMs) + ' at ' + fmt(a.s));
-  if (r.exact) {
-    const when = dw + ' at ' + fmt(r.s);
-    if (r.ok) return 'Yes, ' + when + ' works for me.';
-    return cap(when) + " doesn't work for me. " + (altWords.length ? 'How about ' + orList(altWords) + '?' : 'Could we find another time?');
+function friendlySenderName(from) {
+  // Outlook may provide "Last, First", "First Last", or an email address.
+  let name = String(from || '').trim().replace(/<[^>]*>/g, '').trim();
+  if (!name || name.includes('@')) return '';
+  if (name.includes(',')) name = name.split(',').slice(1).join(',').trim();
+  const first = name.split(/\s+/)[0].replace(/[^\p{L}\p{M}'-]/gu, '');
+  return first.length >= 2 && first.length <= 30 ? first : '';
+}
+function replyText(req, r, nowMs, info) {
+  const first = friendlySenderName(info && info.from);
+  const greeting = first ? 'Hi ' + first + ',' : 'Hi,';
+  const email = ((info && info.body) || '').slice(0, 2500).toLowerCase();
+  const subject = ((info && info.subject) || '').toLowerCase();
+  const organizing = /\b(organizing|organising|coordinating|setting (?:this|it|the meeting) up|putting (?:this|it) together|arranging|scheduling)\b/.test(email + ' ' + subject);
+  const opener = organizing ? 'Thanks for organizing this!' : 'Thanks for reaching out!';
+  const date = dayName(req.ds);
+  const duration = req.durMin;
+  const alts = r.alts.slice(0, 2).map(a => dayName(a.ds) + ' at ' + fmt(a.s));
+  let core = '';
+  if (r.past) {
+    core = 'It looks like the proposed time has already passed. Would you mind confirming another time?';
+  } else if (r.exact) {
+    const when = date + ' from ' + fmtRange(r.s, r.e);
+    if (r.ok) core = when + ' works for me. Looking forward to it!';
+    else core = 'Unfortunately, I have a conflict ' + date + ' from ' + fmtRange(r.s, r.e) + '. ' +
+      (alts.length ? 'Would ' + orList(alts) + ' work instead?' : 'Would another time work?');
+  } else {
+    const label = windowLabel(req.winS, req.winE);
+    if (r.ok) {
+      const blocks = r.freeBlocks.slice(0, 3).map(b => fmtRange(b[0], b[1]));
+      core = 'I have some availability ' + date + (label ? ' in the ' + label : '') + ': ' + orList(blocks) + '. Would any of those times work?';
+    } else {
+      core = 'Unfortunately, I don\'t have a ' + duration + '-minute opening ' + date + (label ? ' during ' + label : '') + '. ' +
+        (alts.length ? 'Would ' + orList(alts) + ' work instead?' : 'Could we find another time?');
+    }
   }
-  const lbl = windowLabel(req.winS, req.winE);
-  const phrase = dw + (lbl ? ' ' + lbl : '');
-  if (r.ok) return "I'm free " + phrase + ' from ' + orList(r.freeBlocks.slice(0, 3).map(b => fmtRange(b[0], b[1]))) + '.';
-  return "I'm booked " + phrase + '.' + (altWords.length ? ' How about ' + orList(altWords) + '?' : '');
+  return greeting + '\n\n' + opener + ' ' + core + '\n\nBest,\nEric';
 }
 
 /* ---- email ---- */
@@ -562,7 +587,7 @@ function looksLikeRequest(m) {
     try { navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); }); } catch (e) { done(false); }
   }
   function openReply(text) {
-    try { state.item.displayReplyForm({ htmlBody: '<p>' + esc(text) + '</p>' }); } catch (e) { toast('Could not open a reply window'); diag('displayReplyForm failed: ' + e); }
+    try { state.item.displayReplyForm({ htmlBody: '<p>' + esc(text).replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>' }); } catch (e) { toast('Could not open a reply window'); diag('displayReplyForm failed: ' + e); }
   }
   function openEvent(r, req) {
     try {
@@ -612,7 +637,7 @@ function looksLikeRequest(m) {
 
     var r = checkRequest(req, state.events, ST, nowMs); state.last = r;
     var word = r.past ? 'PASSED' : r.exact ? (r.ok ? 'FREE' : 'CONFLICT') : (r.ok ? 'OPEN' : 'BOOKED');
-    var reply = replyText(req, r, nowMs);
+    var reply = replyText(req, r, nowMs, state.info);
     var card = h('div', { class: 'card' }, h('div', { class: 'verdict ' + (r.past ? 'neutral' : r.ok ? 'ok' : 'bad'), text: word }));
     if (r.past) card.append(h('p', { text: r.exact ? 'That time has already passed.' : 'That day has already passed.' }));
     else if (r.exact && r.ok) card.append(h('p', { text: 'Nothing on your calendar overlaps.' }));
