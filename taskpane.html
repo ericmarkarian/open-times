@@ -413,8 +413,8 @@ function looksLikeRequest(m) {
   var PAGE_URL = 'https://claude.ai/artifact/BdhgjeHHLHxpEfZJ9Da712';
   var ST = { startMin: 480, endMin: 1200, minLen: 30, tentBusy: true, buffer: 0 };
   var DEF_DUR = 60;
-  var EWS_T = 'http://schemas.microsoft.com/exchange/services/2006/types';
-  var EWS_M = 'http://schemas.microsoft.com/exchange/services/2006/messages';
+  // Paste the https://...workers.dev URL shown after deploying your Cloudflare Worker.
+  var WORKER_BASE = 'https://misty-frost-0581open-times-calendar.eric-markarian.workers.dev';
   var $ = function (id) { return document.getElementById(id); };
   var state = { item: null, info: null, events: [], ranges: [], req: null, note: '', calErr: '', calOk: false, editOpen: false, hold: true, fatal: '', busy: false, last: null };
   var diagLines = [];
@@ -472,50 +472,41 @@ function looksLikeRequest(m) {
     return out;
   }
 
-  /* ---- reading your calendar through Outlook itself (Exchange web services) ---- */
-  function ewsRequest(a, b) {
-    var iso = function (ms) { var d = new Date(ms); return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()).toISOString(); };
-    return '<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:m="' + EWS_M + '" xmlns:t="' + EWS_T + '" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header><t:RequestServerVersion Version="Exchange2013"/></soap:Header><soap:Body><m:FindItem Traversal="Shallow"><m:ItemShape><t:BaseShape>IdOnly</t:BaseShape><t:AdditionalProperties><t:FieldURI FieldURI="item:Subject"/><t:FieldURI FieldURI="calendar:Start"/><t:FieldURI FieldURI="calendar:End"/><t:FieldURI FieldURI="calendar:IsAllDayEvent"/><t:FieldURI FieldURI="calendar:LegacyFreeBusyStatus"/><t:FieldURI FieldURI="calendar:IsCancelled"/></t:AdditionalProperties></m:ItemShape><m:CalendarView MaxEntriesReturned="300" StartDate="' + iso(a) + '" EndDate="' + iso(b + DAY) + '"/><m:ParentFolderIds><t:DistinguishedFolderId Id="calendar"/></m:ParentFolderIds></m:FindItem></soap:Body></soap:Envelope>';
-  }
-  function ews(xml) {
-    return new Promise(function (resolve, reject) {
-      try {
-        Office.context.mailbox.makeEwsRequestAsync(xml, function (r) {
-          if (r.status === Office.AsyncResultStatus.Succeeded) resolve(r.value);
-          else { var er = new Error((r.error && r.error.message) || 'The request failed'); er.code = r.error && r.error.code; reject(er); }
-        });
-      } catch (e) { reject(e); }
-    });
-  }
-  function parseEws(xml) {
-    var doc = new DOMParser().parseFromString(xml, 'text/xml');
-    var rc = doc.getElementsByTagNameNS(EWS_M, 'ResponseCode')[0];
-    if (rc && rc.textContent !== 'NoError') throw new Error('Exchange answered: ' + rc.textContent);
-    var toWall = function (s) { var d = new Date(s); return isNaN(d) ? NaN : Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes()); };
-    var out = [], nodes = doc.getElementsByTagNameNS(EWS_T, 'CalendarItem');
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i];
-      var g = function (k) { var e = n.getElementsByTagNameNS(EWS_T, k)[0]; return e ? e.textContent : ''; };
-      var start = toWall(g('Start')), end = toWall(g('End'));
-      if (isNaN(start) || isNaN(end)) continue;
-      var idn = n.getElementsByTagNameNS(EWS_T, 'ItemId')[0];
-      var fb = g('LegacyFreeBusyStatus').toLowerCase();
-      out.push({ id: (idn ? idn.getAttribute('Id') : g('Subject')) + '|' + start, subject: g('Subject') || '(No title)', start: start, end: end, tz: '', allDay: g('IsAllDayEvent') === 'true', showAs: !fb || fb === 'nodata' ? 'busy' : fb, cancelled: g('IsCancelled') === 'true', location: '' });
-    }
-    return out;
-  }
+  /* ---- read-only calendar bridge: Cloudflare Worker pulls published ICS ---- */
   async function loadCal(ds) {
-    var a = ds - DAY, b = ds + 10 * DAY;
+    var a = ds - DAY, b = ds + 11 * DAY;
     if (state.ranges.some(function (r) { return r.from <= a && r.to >= b; })) return;
-    var evs = parseEws(await ews(ewsRequest(a, b)));
-    var seen = new Set(state.events.map(function (e) { return e.id; }));
-    evs.forEach(function (e) { if (!seen.has(e.id)) { seen.add(e.id); state.events.push(e); } });
-    state.ranges.push({ from: a, to: b }); state.calOk = true; state.calErr = '';
-    diag('Calendar read worked: ' + evs.length + ' events in the window.');
+    if (WORKER_BASE.indexOf('PASTE-YOUR-WORKER') >= 0) throw new Error('SETUP_REQUIRED: Paste your Cloudflare Worker URL in WORKER_BASE in taskpane.html');
+    var base;
+    try { base = new URL(WORKER_BASE); } catch (_) { throw new Error('Invalid WORKER_BASE URL'); }
+    if (base.protocol !== 'https:') throw new Error('Worker URL must use HTTPS');
+    var query = '?from=' + isoDay(a) + '&to=' + isoDay(b);
+    var url = base.origin + '/api/calendar' + query;
+    diag('Bridge request: GET ' + base.origin + '/api/calendar (range ' + isoDay(a) + ' to ' + isoDay(b) + ')');
+    var response;
+    try { response = await fetch(url, { method: 'GET', credentials: 'omit', cache: 'no-store' }); }
+    catch (e) { diag('Network error: ' + e.name + ': ' + e.message); throw new Error('Cannot reach calendar bridge: ' + e.message); }
+    diag('Bridge HTTP ' + response.status + ' ' + response.statusText);
+    var raw = await response.text(), body;
+    try { body = JSON.parse(raw); }
+    catch (_) { diag('Non-JSON bridge reply (first 200 chars): ' + raw.slice(0, 200)); throw new Error('Bridge returned a non-JSON response'); }
+    if (!response.ok || !body.ok) {
+      diag('Bridge error: ' + String(body.code || '?') + ': ' + String(body.error || '?').slice(0, 250));
+      throw new Error('Bridge ' + (body.code || response.status) + ': ' + String(body.error || 'request failed'));
+    }
+    if (!Array.isArray(body.events)) throw new Error('Bridge returned no events array');
+    var evs = body.events.map(normalize).filter(Boolean);
+    // Only treat the requested range as verified after a successful response.
+    // Replace old window data; this is the authoritative published feed snapshot.
+    state.events = evs;
+    state.ranges = [{ from: a, to: b }];
+    state.calOk = true; state.calErr = '';
+    diag('Calendar read worked: ' + evs.length + ' anonymous busy blocks; published ICS (may lag live calendar).');
+    diag('Feed fetched at: ' + String(body.fetchedAt || 'not provided') + ', timezone: ' + String(body.timezone || '?'));
   }
   async function tryCal(ds) {
     try { await loadCal(ds); }
-    catch (e) { state.calErr = String((e && e.message) || e); diag('Calendar read failed: ' + state.calErr + (e && e.code ? ' (code ' + e.code + ')' : '')); }
+    catch (e) { state.calOk = false; state.calErr = String((e && e.message) || e); diag('Calendar read failed: ' + state.calErr); }
   }
 
   /* ---- the email ---- */
@@ -530,7 +521,7 @@ function looksLikeRequest(m) {
   async function start() {
     if (state.busy) return; state.busy = true;
     try {
-      state.fatal = ''; state.calErr = ''; state.last = null;
+      state.fatal = ''; state.calErr = ''; state.calOk = false; state.last = null;
       var item = Office.context.mailbox && Office.context.mailbox.item;
       state.item = item || null; state.info = null; state.req = null;
       if (!item) { $('status').textContent = 'No email open'; render(); return; }
@@ -582,7 +573,7 @@ function looksLikeRequest(m) {
       });
     } catch (e) { toast('Could not open the event form'); diag('displayNewAppointmentForm failed: ' + e); }
   }
-  async function edited() { state.last = null; render(); await tryCal(state.req.ds); render(); }
+  async function edited() { state.last = null; if (!state.ranges.some(function (r) { return r.from <= state.req.ds - DAY && r.to >= state.req.ds + 11 * DAY; })) state.calOk = false; render(); await tryCal(state.req.ds); render(); }
 
   function render() {
     var p = $('panel'); p.replaceChildren();
