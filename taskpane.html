@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Times</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+:root {
+  --bg: #f4f6f4; --surface: #ffffff; --fg: #17201c; --muted: #58655f; --line: #dde3df; --track: #e7ece9;
+  --busy: #aeb9b3; --free: #0e7a5a; --free-soft: #dcf2ea; --free-ink: #0a5f46; --on-free: #ffffff;
+  --err: #a3281f; --err-soft: #fbe9e7;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0e1412; --surface: #151c19; --fg: #e6ece8; --muted: #97a59e; --line: #25302b; --track: #212b27;
+    --busy: #4a5953; --free: #4fcfa3; --free-soft: #14352a; --free-ink: #7fe3c0; --on-free: #062117;
+    --err: #ff9a90; --err-soft: #3a1a17; color-scheme: dark; }
+}
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; padding: 12px; }
+.app { display: grid; gap: 12px; }
+.stack { display: grid; gap: 12px; }
+h1 { font-size: 20px; margin: 0; line-height: 1.1; }
+p { margin: 0; }
+.muted { color: var(--muted); } .small { font-size: 12px; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
+.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.icon-btn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 18px; line-height: 1; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 10px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.between { justify-content: space-between; }
+.primary { background: var(--free); color: var(--on-free); border: 0; border-radius: 8px; min-height: 36px; padding: 0 14px; font-weight: 600; }
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 8px; min-height: 36px; padding: 0 12px; font-weight: 500; }
+.sum { font-weight: 600; overflow-wrap: anywhere; }
+.sub-h { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.verdict { font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -.02em; }
+.verdict.ok { color: var(--free-ink); } .verdict.bad { color: var(--err); } .verdict.neutral { color: var(--muted); }
+.hit-row { background: var(--err-soft); color: var(--err); border-radius: 8px; padding: 6px 10px; overflow-wrap: anywhere; }
+.suggest-text { padding: 10px 12px; border-radius: 8px; background: var(--track); overflow-wrap: anywhere; }
+.note { background: var(--track); border-radius: 8px; padding: 8px 10px; font-size: 13px; overflow-wrap: anywhere; }
+.notice { background: var(--err-soft); color: var(--err); border-radius: 10px; padding: 12px; display: grid; gap: 6px; overflow-wrap: anywhere; }
+.slots { display: flex; gap: 6px; flex-wrap: wrap; }
+.slot { padding: 4px 8px; border-radius: 6px; background: var(--free-soft); color: var(--free-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ctl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ctl-grid .field:first-child { grid-column: 1 / -1; }
+.field { display: grid; gap: 3px; font-size: 12px; color: var(--muted); min-width: 0; }
+input[type="date"], input[type="time"], input[type="text"], select { width: 100%; min-height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); padding: 0 8px; }
+.check { display: flex; gap: 8px; align-items: center; min-height: 32px; }
+.bar { position: relative; height: 10px; border-radius: 5px; background: var(--track); overflow: hidden; }
+.seg { position: absolute; top: 0; bottom: 0; } .seg.busy { background: var(--busy); } .seg.free { background: var(--free); }
+.seg.req { top: 1px; bottom: 1px; border: 2px solid var(--fg); border-radius: 3px; background: transparent; }
+.bar-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.list { display: grid; gap: 6px; }
+.ev { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; display: grid; grid-template-columns: 84px minmax(0,1fr); gap: 2px 8px; }
+.ev-time { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 12px; } .ev-title { overflow-wrap: anywhere; }
+.ev.soft { opacity: .75; } .ev.hit { border-color: var(--err); } .ev.req { background: var(--free-soft); border-color: var(--free); }
+.empty { color: var(--muted); font-size: 13px; }
+details.tech summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; background: var(--track); padding: 8px; border-radius: 8px; margin: 6px 0 0; }
+a.link { color: var(--free-ink); font-weight: 600; }
+.toast { position: fixed; left: 12px; right: 12px; bottom: 12px; background: var(--fg); color: var(--bg); padding: 8px 12px; border-radius: 8px; text-align: center; }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <div><h1>Open Times</h1><p id="status" class="muted small">Starting…</p></div>
+    <button id="reread" class="icon-btn" type="button" aria-label="Read this email again">&#8635;</button>
+  </header>
+  <section id="panel" class="stack"></section>
+  <details class="tech"><summary>Technical details</summary><pre id="diag"></pre></details>
+</main>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+/* LOGIC START */
+const MIN = 60000, DAY = 86400000;
+const pad = n => String(n).padStart(2, '0');
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DOWFULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Outlook returns wall-clock strings in the mailbox time zone. Keep them as wall-clock
+// by encoding them as UTC milliseconds, so no time zone conversion ever happens.
+function wall(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(s || ''));
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : NaN;
+}
+function dayStartOf(ms) { return Math.floor(ms / DAY) * DAY; }
+function isoDay(ms) { const d = new Date(ms); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+function inputTime(m) { return pad(Math.floor(m / 60) % 24) + ':' + pad(m % 60); }
+
+function splitJson(t) {
+  const out = [];
+  let depth = 0, inStr = false, esc = false, st = -1;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"' && depth > 0) { inStr = true; continue; }
+    if (c === '{' || c === '[') { if (depth === 0) st = i; depth++; }
+    else if (c === '}' || c === ']') {
+      depth--;
+      if (depth === 0 && st >= 0) { try { out.push(JSON.parse(t.slice(st, i + 1))); } catch (e) {} st = -1; }
+      if (depth < 0) depth = 0;
+    }
+  }
+  return out;
+}
+
+function extract(res) {
+  const vals = [];
+  for (const b of (res && res.content) || []) {
+    if (b && b.type === 'text' && typeof b.text === 'string') splitJson(b.text).forEach(v => vals.push(v));
+  }
+  if (!vals.length && res) {
+    if (res.structuredContent != null) vals.push(res.structuredContent);
+    else if (res.payload != null && typeof res.payload === 'object') vals.push(res.payload);
+  }
+  const events = [];
+  let next = null;
+  const visit = v => {
+    if (Array.isArray(v)) { v.forEach(visit); return; }
+    if (!v || typeof v !== 'object') return;
+    if (v.start && v.end && typeof v.start === 'object') events.push(v);
+    if (Array.isArray(v.events)) v.events.forEach(visit);
+    if (v.nextOffset != null) next = v.nextOffset;
+  };
+  vals.forEach(visit);
+  return { events, next };
+}
+
+function normalize(e) {
+  const start = wall(e.start && e.start.dateTime), end = wall(e.end && e.end.dateTime);
+  if (isNaN(start) || isNaN(end)) return null;
+  return {
+    id: e.id || (String(e.subject) + start),
+    subject: e.subject || '(No title)',
+    start, end,
+    tz: (e.start && e.start.timeZone) || '',
+    allDay: !!e.isAllDay,
+    showAs: String(e.showAs || 'busy').toLowerCase(),
+    cancelled: !!e.isCancelled,
+    location: typeof e.location === 'string' ? e.location : '',
+  };
+}
+
+function blocks(ev, st) {
+  if (ev.showAs === 'free' || ev.showAs === 'workingelsewhere') return false;
+  if (ev.showAs === 'tentative') return !!st.tentBusy;
+  return true;
+}
+
+// ds = start of day (ms). Minutes are from midnight. Returns open blocks inside the user's hours.
+function computeDay(ds, evs, st, nowMs) {
+  let ws = st.startMin; const we = st.endMin;
+  const buf = st.buffer || 0;
+  const isToday = nowMs >= ds && nowMs < ds + DAY;
+  if (isToday) ws = Math.max(ws, Math.ceil((nowMs - ds) / MIN / 15) * 15);
+  const busy = [], allDay = [];
+  for (const ev of evs) {
+    if (ev.cancelled) continue;
+    if (ev.allDay) {
+      if (ev.start < ds + DAY && ev.end > ds) { allDay.push(ev); if (ev.showAs === 'oof') busy.push({ s: 0, e: 1440, ev }); }
+      continue;
+    }
+    if (ev.end <= ds || ev.start >= ds + DAY) continue;
+    if (!blocks(ev, st)) continue;
+    busy.push({ s: Math.max(0, (ev.start - ds) / MIN), e: Math.min(1440, (ev.end - ds) / MIN), ev });
+  }
+  busy.sort((a, b) => a.s - b.s);
+  const mergeList = list => {
+    const out = [];
+    for (const b of list) {
+      const L = out[out.length - 1];
+      if (L && b.s <= L.e) L.e = Math.max(L.e, b.e); else out.push({ s: b.s, e: b.e });
+    }
+    return out;
+  };
+  const merged = mergeList(busy);
+  const padded = mergeList(merged.map(m => ({ s: m.s - buf, e: m.e + buf })));
+  const free = [];
+  let cur = ws;
+  if (we > ws) {
+    for (const m of padded) {
+      if (m.e <= cur) continue;
+      if (m.s >= we) break;
+      if (m.s - cur >= st.minLen) free.push([cur, m.s]);
+      cur = Math.max(cur, m.e);
+    }
+    if (we - cur >= st.minLen) free.push([cur, we]);
+  }
+  return { ds, free, merged, allDay, isToday };
+}
+
+function fmt(m) {
+  const h = Math.floor(m / 60) % 24, mi = m % 60, ap = h >= 12 ? 'pm' : 'am', h12 = h % 12 || 12;
+  return mi ? h12 + ':' + pad(mi) + ap : h12 + ap;
+}
+function fmtRange(a, b) {
+  const A = fmt(a), B = fmt(b);
+  return (A.slice(-2) === B.slice(-2) ? A.slice(0, -2) : A) + '–' + B;
+}
+function dayShort(ds) { const d = new Date(ds); return DOW[d.getUTCDay()] + ' ' + (d.getUTCMonth() + 1) + '/' + d.getUTCDate(); }
+function dayLine(day) {
+  const lbl = dayShort(day.ds);
+  if (!day.free.length) return lbl + ': booked up';
+  return lbl + ': free ' + day.free.map(f => fmtRange(f[0], f[1])).join(', ');
+}
+function dayName(ds) { const d = new Date(ds); return DOWFULL[d.getUTCDay()] + ', ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate(); }
+function dayWord(ds, nowMs) {
+  const diff = Math.round((ds - dayStartOf(nowMs)) / DAY);
+  if (diff === 0) return 'today';
+  if (diff === 1) return 'tomorrow';
+  const d = new Date(ds);
+  if (diff > 1 && diff < 7) return DOWFULL[d.getUTCDay()];
+  return DOW[d.getUTCDay()] + ' ' + (d.getUTCMonth() + 1) + '/' + d.getUTCDate();
+}
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+function orList(a) { return a.length <= 1 ? (a[0] || '') : a.length === 2 ? a[0] + ' or ' + a[1] : a.slice(0, -1).join(', ') + ', or ' + a[a.length - 1]; }
+function windowLabel(ws, we) {
+  if (ws == null || we == null) return '';
+  if (ws === 480 && we === 720) return 'morning';
+  if (ws === 720 && we === 1020) return 'afternoon';
+  if (ws === 1020 && we === 1260) return 'evening';
+  return fmtRange(ws, we);
+}
+
+/* ---- reading the message ---- */
+function validateParse(o, nowMs, defDur) {
+  if (!o || typeof o !== 'object' || !o.found) return null;
+  const ds = /^\d{4}-\d{2}-\d{2}$/.test(String(o.date)) ? wall(o.date + 'T00:00') : NaN;
+  if (isNaN(ds) || ds < nowMs - 400 * DAY || ds > nowMs + 1200 * DAY) return null;
+  const tm = v => { const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(v == null ? '' : v)); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+  const s = tm(o.start), e = tm(o.end);
+  let ws = tm(o.windowStart), we = tm(o.windowEnd);
+  let dur = Number(o.durationMin);
+  dur = isFinite(dur) && dur >= 15 && dur <= 480 ? Math.round(dur / 15) * 15 : null;
+  if (s != null && e != null && e > s) dur = e - s;
+  if (!dur) dur = defDur;
+  if (s != null || ws == null || we == null || we <= ws) { ws = null; we = null; }
+  const clean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
+  return { ds, startMin: s, durMin: dur, winS: ws, winE: we, title: clean(o.title, 60), note: clean(o.note, 160) };
+}
+
+// Plain fallback when Claude is not available. Handles the common phrasings only.
+function localParse(text, nowMs, defDur) {
+  const t = String(text || '').toLowerCase();
+  const today = dayStartOf(nowMs), dow = new Date(today).getUTCDay();
+  let ds = null;
+  const wk = [/\bsun(day)?\b/, /\bmon(day)?\b/, /\btue(s|sday)?\b/, /\bwed(nesday)?\b/, /\bthu(r|rs|rsday)?\b/, /\bfri(day)?\b/, /\bsat(urday)?\b/];
+  const md = /\b(\d{1,2})\/(\d{1,2})\b/.exec(t);
+  if (/\btonight\b|\btoday\b/.test(t)) ds = today;
+  else if (/\btomorrow\b|\btmrw\b/.test(t)) ds = today + DAY;
+  else if (md && +md[1] >= 1 && +md[1] <= 12 && +md[2] >= 1 && +md[2] <= 31) {
+    const y = new Date(today).getUTCFullYear();
+    let c = Date.UTC(y, +md[1] - 1, +md[2]);
+    if (c < today) c = Date.UTC(y + 1, +md[1] - 1, +md[2]);
+    ds = c;
+  } else {
+    for (let i = 0; i < 7; i++) if (wk[i].test(t)) { let diff = (i - dow + 7) % 7; if (diff === 0) diff = 7; ds = today + diff * DAY; break; }
+  }
+  if (ds == null) return null;
+  let startMin = null, winS = null, winE = null;
+  let m = /\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)/.exec(t);
+  if (m) { let h = (+m[1]) % 12; if (/^p/.test(m[3])) h += 12; startMin = h * 60 + (+m[2] || 0); }
+  else if (/\bnoon\b/.test(t)) startMin = 720;
+  else {
+    m = /\bat\s+(1[0-2]|0?[1-9])(?::([0-5]\d))?\b/.exec(t);
+    if (m) { let h = +m[1]; if (h >= 1 && h <= 7) h += 12; startMin = h * 60 + (+m[2] || 0); }
+  }
+  if (startMin == null) {
+    if (/\blunch\b/.test(t)) startMin = 720;
+    else if (/\bdinner\b/.test(t)) startMin = 1110;
+    else if (/\bbrunch\b/.test(t)) startMin = 660;
+    else if (/\bmorning\b/.test(t)) { winS = 480; winE = 720; }
+    else if (/\bafternoon\b/.test(t)) { winS = 720; winE = 1020; }
+    else if (/\bevening\b|\btonight\b/.test(t)) { winS = 1020; winE = 1260; }
+  }
+  return { ds, startMin, durMin: defDur, winS, winE, title: '', note: '' };
+}
+
+/* ---- checking a request ---- */
+function candidateSlots(free, dur, target, lo, hi) {
+  const c = [];
+  for (const [a, b] of free) {
+    for (let s = Math.ceil(a / 30) * 30; s + dur <= b; s += 30) {
+      if (lo != null && s < lo) continue;
+      if (hi != null && s + dur > hi) continue;
+      c.push(s);
+    }
+  }
+  c.sort((x, y) => Math.abs(x - target) - Math.abs(y - target) || x - y);
+  const out = [];
+  for (const s of c) if (out.every(o => Math.abs(o - s) >= 60)) out.push(s);
+  return out;
+}
+
+function findAlternatives(req, evs, st, nowMs, count) {
+  const dur = req.durMin, today = dayStartOf(nowMs);
+  const target = req.startMin != null ? req.startMin : (req.winS != null ? req.winS : 720);
+  const lo = req.startMin == null && req.winS != null ? req.winS : null;
+  const hi = req.startMin == null && req.winE != null ? req.winE : null;
+  const out = [];
+  if (req.ds >= today) {
+    candidateSlots(computeDay(req.ds, evs, st, nowMs).free, dur, target, lo, hi)
+      .filter(s => req.startMin == null || s !== req.startMin).slice(0, 2)
+      .forEach(s => out.push({ ds: req.ds, s }));
+  }
+  const base = Math.max(req.ds, today);
+  for (let i = req.ds >= today ? 1 : 0; i <= 10 && out.length < count; i++) {
+    const ds = base + i * DAY;
+    const c = candidateSlots(computeDay(ds, evs, st, nowMs).free, dur, target, lo, hi);
+    if (c.length) out.push({ ds, s: c[0] });
+  }
+  return out.slice(0, count);
+}
+
+function overlapsBuf(ev, ds, s, e, buf) { return ev.start < ds + (e + buf) * MIN && ev.end > ds + (s - buf) * MIN; }
+
+function checkRequest(req, evs, st, nowMs) {
+  const ds = req.ds, buf = st.buffer || 0;
+  const dayEvs = evs.filter(e => !e.cancelled && e.start < ds + DAY && e.end > ds)
+    .sort((a, b) => (a.allDay === b.allDay ? a.start - b.start : a.allDay ? -1 : 1));
+  const day = computeDay(ds, evs, st, nowMs);
+  const out = { ds, dayEvs, day, conflicts: [], freeBlocks: [], alts: [], outside: false, past: false, exact: req.startMin != null, s: null, e: null, ok: false };
+  if (out.exact) {
+    out.s = req.startMin; out.e = req.startMin + req.durMin;
+    out.past = ds + out.s * MIN < nowMs;
+    out.outside = out.s < st.startMin || out.e > st.endMin;
+    for (const ev of dayEvs) {
+      if (ev.allDay) { if (ev.showAs === 'oof') out.conflicts.push({ ev, tight: false }); continue; }
+      if (!blocks(ev, st)) continue;
+      if (overlapsBuf(ev, ds, out.s, out.e, 0)) out.conflicts.push({ ev, tight: false });
+      else if (buf && overlapsBuf(ev, ds, out.s, out.e, buf)) out.conflicts.push({ ev, tight: true });
+    }
+  } else {
+    const lo = req.winS, hi = req.winE;
+    for (const [a, b] of day.free) {
+      const A = lo != null ? Math.max(a, lo) : a, B = hi != null ? Math.min(b, hi) : b;
+      if (B - A >= req.durMin) out.freeBlocks.push([A, B]);
+    }
+    out.past = nowMs >= ds + DAY;
+  }
+  const bad = out.exact ? (out.conflicts.length > 0 || out.past) : (out.freeBlocks.length === 0 || out.past);
+  out.ok = !bad;
+  if (!out.ok) out.alts = findAlternatives(req, evs, st, nowMs, 4);
+  return out;
+}
+
+function replyText(req, r, nowMs) {
+  const dw = dayWord(req.ds, nowMs);
+  const altWords = r.alts.slice(0, 3).map(a => dayWord(a.ds, nowMs) + ' at ' + fmt(a.s));
+  if (r.exact) {
+    const when = dw + ' at ' + fmt(r.s);
+    if (r.ok) return 'Yes, ' + when + ' works for me.';
+    return cap(when) + " doesn't work for me. " + (altWords.length ? 'How about ' + orList(altWords) + '?' : 'Could we find another time?');
+  }
+  const lbl = windowLabel(req.winS, req.winE);
+  const phrase = dw + (lbl ? ' ' + lbl : '');
+  if (r.ok) return "I'm free " + phrase + ' from ' + orList(r.freeBlocks.slice(0, 3).map(b => fmtRange(b[0], b[1]))) + '.';
+  return "I'm booked " + phrase + '.' + (altWords.length ? ' How about ' + orList(altWords) + '?' : '');
+}
+
+/* ---- email ---- */
+function extractMail(res) {
+  const vals = [];
+  for (const b of (res && res.content) || []) {
+    if (b && b.type === 'text' && typeof b.text === 'string') splitJson(b.text).forEach(v => vals.push(v));
+  }
+  if (!vals.length && res && res.structuredContent != null) vals.push(res.structuredContent);
+  if (!vals.length && res && res.payload != null && typeof res.payload === 'object') vals.push(res.payload);
+  const mails = [];
+  const visit = v => {
+    if (Array.isArray(v)) { v.forEach(visit); return; }
+    if (!v || typeof v !== 'object') return;
+    if (typeof v.id === 'string' && 'subject' in v) {
+      mails.push({
+        id: v.id,
+        subject: String(v.subject || '(No subject)'),
+        sender: String(v.sender || ''),
+        senderName: String(v.senderName || v.sender || 'Unknown sender'),
+        received: String(v.receivedDateTime || ''),
+        summary: String(v.summary || '').replace(/\r\n?/g, '\n').trim(),
+        link: typeof v.webLink === 'string' ? v.webLink : '',
+      });
+    }
+    if (Array.isArray(v.emails)) v.emails.forEach(visit);
+  };
+  vals.forEach(visit);
+  return { mails };
+}
+
+// Rough filter for "does this look like someone asking about a time". The All filter shows everything else.
+function looksLikeRequest(m) {
+  if (/no-?reply|noreply|do-?not-?reply|mailer-daemon|notifications?@/i.test(m.sender)) return false;
+  const t = (m.subject + ' ' + m.summary).toLowerCase();
+  const kw = /\b(free|available|availability|meet(ing)?|call|chat|coffee|lunch|dinner|brunch|drinks|schedul\w*|resched\w*|catch up|sync|works? for you|can you make|are you around|rsvp)\b/.test(t);
+  const day = /\b(today|tonight|tomorrow|mon(day)?|tue(s|sday)?|wed(nesday)?|thu(r|rs|rsday)?|fri(day)?|sat(urday)?|sun(day)?)\b/.test(t);
+  const time = /\b(1[0-2]|0?[1-9])(:[0-5]\d)?\s*(a\.?m\.?|p\.?m\.?)/.test(t) || /\bnoon\b/.test(t);
+  return kw || (day && time);
+}
+/* LOGIC END */
+
+(function () {
+  'use strict';
+  var PAGE_URL = 'https://claude.ai/artifact/BdhgjeHHLHxpEfZJ9Da712';
+  var ST = { startMin: 480, endMin: 1200, minLen: 30, tentBusy: true, buffer: 0 };
+  var DEF_DUR = 60;
+  var EWS_T = 'http://schemas.microsoft.com/exchange/services/2006/types';
+  var EWS_M = 'http://schemas.microsoft.com/exchange/services/2006/messages';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { item: null, info: null, events: [], ranges: [], req: null, note: '', calErr: '', calOk: false, editOpen: false, hold: true, fatal: '', busy: false, last: null };
+  var diagLines = [];
+  function diag(s) { diagLines.push(s); $('diag').textContent = diagLines.join('\n'); }
+
+  function h(tag, props) {
+    var el = document.createElement(tag);
+    if (props) Object.keys(props).forEach(function (k) {
+      var v = props[k];
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k === 'value') el.value = v;
+      else if (k.indexOf('on') === 0) el.addEventListener(k.slice(2), v);
+      else if (v === true) el.setAttribute(k, '');
+      else if (v !== false && v != null) el.setAttribute(k, v);
+    });
+    for (var i = 2; i < arguments.length; i++) {
+      var kids = [].concat(arguments[i]);
+      kids.forEach(function (kid) { if (kid == null || kid === false) return; el.append(kid.nodeType ? kid : document.createTextNode(String(kid))); });
+    }
+    return el;
+  }
+  var toastT = null;
+  function toast(m) { var t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2500); }
+  function nowWall() { var d = new Date(); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes()); }
+  function durLabel(m) { return m < 60 ? m + ' min' : m === 60 ? '1 hour' : (m / 60) + ' hours'; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function toLocalDate(ds, m) { var d = new Date(ds + m * MIN); return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes()); }
+
+  /* ---- reading the email text (no Claude here, so this is simpler than the page) ---- */
+  var MON = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/;
+  var MON3 = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  function parseText(text, nowMs, defDur) {
+    var t = String(text || '').toLowerCase();
+    var base = localParse(text, nowMs, defDur);
+    var today = dayStartOf(nowMs);
+    var ds = base ? base.ds : null;
+    var mm = MON.exec(t);
+    if (mm && +mm[2] >= 1 && +mm[2] <= 31) {
+      var y = new Date(today).getUTCFullYear(), mo = MON3.indexOf(mm[1].slice(0, 3));
+      var c = Date.UTC(y, mo, +mm[2]); if (c < today) c = Date.UTC(y + 1, mo, +mm[2]);
+      ds = c;
+    }
+    if (ds == null) return null;
+    var out = base ? Object.assign({}, base, { ds: ds }) : { ds: ds, startMin: null, durMin: defDur, winS: null, winE: null, title: '', note: '' };
+    var rg = /\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)?\s*(?:-|–|—|to|until)\s*(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)/.exec(t);
+    if (rg) {
+      var pmEnd = /^p/.test(rg[6]);
+      var eh = (+rg[4]) % 12 + (pmEnd ? 12 : 0), em = +rg[5] || 0, hasS = !!rg[3];
+      var sh = (+rg[1]) % 12 + ((hasS ? /^p/.test(rg[3]) : pmEnd) ? 12 : 0);
+      if (!hasS && sh >= eh) sh -= 12;
+      var s = sh * 60 + (+rg[2] || 0), e = eh * 60 + em;
+      if (s >= 0 && e > s && e - s <= 480) { out.startMin = s; out.durMin = e - s; out.winS = null; out.winE = null; }
+    }
+    return out;
+  }
+
+  /* ---- reading your calendar through Outlook itself (Exchange web services) ---- */
+  function ewsRequest(a, b) {
+    var iso = function (ms) { var d = new Date(ms); return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()).toISOString(); };
+    return '<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:m="' + EWS_M + '" xmlns:t="' + EWS_T + '" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Header><t:RequestServerVersion Version="Exchange2013"/></soap:Header><soap:Body><m:FindItem Traversal="Shallow"><m:ItemShape><t:BaseShape>IdOnly</t:BaseShape><t:AdditionalProperties><t:FieldURI FieldURI="item:Subject"/><t:FieldURI FieldURI="calendar:Start"/><t:FieldURI FieldURI="calendar:End"/><t:FieldURI FieldURI="calendar:IsAllDayEvent"/><t:FieldURI FieldURI="calendar:LegacyFreeBusyStatus"/><t:FieldURI FieldURI="calendar:IsCancelled"/></t:AdditionalProperties></m:ItemShape><m:CalendarView MaxEntriesReturned="300" StartDate="' + iso(a) + '" EndDate="' + iso(b + DAY) + '"/><m:ParentFolderIds><t:DistinguishedFolderId Id="calendar"/></m:ParentFolderIds></m:FindItem></soap:Body></soap:Envelope>';
+  }
+  function ews(xml) {
+    return new Promise(function (resolve, reject) {
+      try {
+        Office.context.mailbox.makeEwsRequestAsync(xml, function (r) {
+          if (r.status === Office.AsyncResultStatus.Succeeded) resolve(r.value);
+          else { var er = new Error((r.error && r.error.message) || 'The request failed'); er.code = r.error && r.error.code; reject(er); }
+        });
+      } catch (e) { reject(e); }
+    });
+  }
+  function parseEws(xml) {
+    var doc = new DOMParser().parseFromString(xml, 'text/xml');
+    var rc = doc.getElementsByTagNameNS(EWS_M, 'ResponseCode')[0];
+    if (rc && rc.textContent !== 'NoError') throw new Error('Exchange answered: ' + rc.textContent);
+    var toWall = function (s) { var d = new Date(s); return isNaN(d) ? NaN : Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes()); };
+    var out = [], nodes = doc.getElementsByTagNameNS(EWS_T, 'CalendarItem');
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      var g = function (k) { var e = n.getElementsByTagNameNS(EWS_T, k)[0]; return e ? e.textContent : ''; };
+      var start = toWall(g('Start')), end = toWall(g('End'));
+      if (isNaN(start) || isNaN(end)) continue;
+      var idn = n.getElementsByTagNameNS(EWS_T, 'ItemId')[0];
+      var fb = g('LegacyFreeBusyStatus').toLowerCase();
+      out.push({ id: (idn ? idn.getAttribute('Id') : g('Subject')) + '|' + start, subject: g('Subject') || '(No title)', start: start, end: end, tz: '', allDay: g('IsAllDayEvent') === 'true', showAs: !fb || fb === 'nodata' ? 'busy' : fb, cancelled: g('IsCancelled') === 'true', location: '' });
+    }
+    return out;
+  }
+  async function loadCal(ds) {
+    var a = ds - DAY, b = ds + 10 * DAY;
+    if (state.ranges.some(function (r) { return r.from <= a && r.to >= b; })) return;
+    var evs = parseEws(await ews(ewsRequest(a, b)));
+    var seen = new Set(state.events.map(function (e) { return e.id; }));
+    evs.forEach(function (e) { if (!seen.has(e.id)) { seen.add(e.id); state.events.push(e); } });
+    state.ranges.push({ from: a, to: b }); state.calOk = true; state.calErr = '';
+    diag('Calendar read worked: ' + evs.length + ' events in the window.');
+  }
+  async function tryCal(ds) {
+    try { await loadCal(ds); }
+    catch (e) { state.calErr = String((e && e.message) || e); diag('Calendar read failed: ' + state.calErr + (e && e.code ? ' (code ' + e.code + ')' : '')); }
+  }
+
+  /* ---- the email ---- */
+  function readBody() {
+    return new Promise(function (resolve) {
+      try { state.item.body.getAsync(Office.CoercionType.Text, function (r) { resolve(r.status === Office.AsyncResultStatus.Succeeded ? String(r.value || '') : ''); }); }
+      catch (e) { resolve(''); }
+    });
+  }
+  function cleanTitle(s) { return String(s || '').replace(/^((re|fw|fwd)\s*:\s*)+/i, '').trim().slice(0, 60) || 'Meeting'; }
+
+  async function start() {
+    if (state.busy) return; state.busy = true;
+    try {
+      state.fatal = ''; state.calErr = ''; state.last = null;
+      var item = Office.context.mailbox && Office.context.mailbox.item;
+      state.item = item || null; state.info = null; state.req = null;
+      if (!item) { $('status').textContent = 'No email open'; render(); return; }
+      if (typeof item.subject !== 'string') { state.fatal = 'Open Times works on emails you have received. Open one and tap the button again.'; render(); return; }
+      var body = await readBody();
+      var from = item.from ? (item.from.displayName || item.from.emailAddress || '') : '';
+      state.info = { subject: item.subject, from: from, body: body };
+      var text = item.subject + '\n' + body.slice(0, 2500);
+      var nowMs = nowWall();
+      var req = parseText(text, nowMs, DEF_DUR);
+      state.note = '';
+      if (!req) { req = { ds: dayStartOf(nowMs), startMin: null, durMin: DEF_DUR, winS: null, winE: null, title: '', note: '' }; state.note = 'I could not find a day in this email. Pick the day and time.'; state.editOpen = true; }
+      else state.editOpen = false;
+      state.req = req;
+      $('status').textContent = 'Reading your calendar…'; render();
+      await tryCal(req.ds);
+      $('status').textContent = state.calOk ? 'Calendar connected' : 'Calendar not readable here';
+      render();
+    } finally { state.busy = false; }
+  }
+
+  /* ---- drawing ---- */
+  function makeBar(day, lo, hi, rs, re) {
+    var span = hi - lo, bar = h('div', { class: 'bar' });
+    var place = function (a, b, cls) { var s = Math.max(a, lo), e = Math.min(b, hi); if (e <= s) return; var seg = h('div', { class: 'seg ' + cls }); seg.style.left = ((s - lo) / span * 100) + '%'; seg.style.width = ((e - s) / span * 100) + '%'; bar.append(seg); };
+    day.merged.forEach(function (m) { place(m.s, m.e, 'busy'); });
+    day.free.forEach(function (f) { place(f[0], f[1], 'free'); });
+    if (rs != null) place(rs, re, 'req');
+    return bar;
+  }
+  function evRow(e, ds, extra) {
+    var t = e.allDay ? 'All day' : fmtRange(Math.max(0, (e.start - ds) / MIN), Math.min(1440, (e.end - ds) / MIN));
+    var meta = [extra || '', e.showAs === 'tentative' ? 'Tentative' : e.showAs === 'free' ? 'Shown as free' : ''].filter(Boolean).join(' · ');
+    return h('div', { class: 'ev' + (e.allDay || e.showAs === 'free' ? ' soft' : '') }, h('div', { class: 'ev-time', text: t }), h('div', { class: 'ev-title', text: e.subject }), meta ? h('div', { class: 'ev-title muted small', text: meta }) : null);
+  }
+  function copyText(text) {
+    var done = function (ok) { toast(ok ? 'Copied' : 'Copy was blocked. Select the text and copy it.'); };
+    try { navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); }); } catch (e) { done(false); }
+  }
+  function openReply(text) {
+    try { state.item.displayReplyForm({ htmlBody: '<p>' + esc(text) + '</p>' }); } catch (e) { toast('Could not open a reply window'); diag('displayReplyForm failed: ' + e); }
+  }
+  function openEvent(r, req) {
+    try {
+      Office.context.mailbox.displayNewAppointmentForm({
+        subject: (state.hold ? 'Hold: ' : '') + cleanTitle(state.info.subject),
+        start: toLocalDate(req.ds, r.s), end: toLocalDate(req.ds, r.e),
+        body: 'From the email: ' + state.info.subject
+      });
+    } catch (e) { toast('Could not open the event form'); diag('displayNewAppointmentForm failed: ' + e); }
+  }
+  async function edited() { state.last = null; render(); await tryCal(state.req.ds); render(); }
+
+  function render() {
+    var p = $('panel'); p.replaceChildren();
+    if (state.fatal) { p.append(h('div', { class: 'notice', text: state.fatal })); return; }
+    if (!state.info) { p.append(h('p', { class: 'empty', text: state.item ? 'Reading…' : 'Open an email, then tap the Open Times button.' })); return; }
+    var req = state.req, nowMs = nowWall();
+    var lbl = windowLabel(req.winS, req.winE);
+    var when = req.startMin != null ? dayName(req.ds) + ', ' + fmtRange(req.startMin, req.startMin + req.durMin) : dayName(req.ds) + (lbl ? ', ' + lbl : '');
+
+    var date = h('input', { type: 'date', value: isoDay(req.ds) });
+    var time = h('input', { type: 'time', step: '900', value: req.startMin != null ? inputTime(req.startMin) : '' });
+    var durs = [30, 45, 60, 90, 120, 180]; if (durs.indexOf(req.durMin) < 0) durs.push(req.durMin); durs.sort(function (a, b) { return a - b; });
+    var dur = h('select', null, durs.map(function (m) { return h('option', { value: String(m), text: durLabel(m), selected: m === req.durMin }); }));
+    date.addEventListener('change', function () { if (/^\d{4}-\d{2}-\d{2}$/.test(date.value)) { req.ds = wall(date.value + 'T00:00'); edited(); } });
+    time.addEventListener('change', function () { var m = /^(\d{2}):(\d{2})/.exec(time.value); req.startMin = m ? (+m[1]) * 60 + (+m[2]) : null; if (req.startMin != null) { req.winS = null; req.winE = null; } edited(); });
+    dur.addEventListener('change', function () { req.durMin = +dur.value; edited(); });
+
+    p.append(h('div', { class: 'card' },
+      h('div', { class: 'row between' },
+        h('div', null, h('p', { class: 'sub-h', text: 'Email from ' + state.info.from }), h('p', { class: 'sum', text: state.info.subject })),
+        h('button', { class: 'ghost', type: 'button', text: state.editOpen ? 'Done' : 'Edit', onclick: function () { state.editOpen = !state.editOpen; render(); } })),
+      h('p', { class: 'sum', text: 'I read: ' + when + ' · ' + durLabel(req.durMin) }),
+      state.note ? h('p', { class: 'note', text: state.note }) : null,
+      state.editOpen ? h('div', { class: 'ctl-grid' }, h('label', { class: 'field' }, 'Day', date), h('label', { class: 'field' }, 'Start time', time), h('label', { class: 'field' }, 'Length', dur)) : null));
+
+    if (!state.calOk) {
+      var tx = state.info.subject + '\n\n' + state.info.body.slice(0, 1500);
+      p.append(h('div', { class: 'card' },
+        state.calErr ? h('div', { class: 'notice' }, h('strong', { text: 'I cannot read your calendar from here' }), h('p', { text: state.calErr })) : h('p', { class: 'empty', text: 'Reading your calendar…' }),
+        state.calErr ? h('div', { class: 'row' },
+          h('button', { class: 'primary', type: 'button', text: 'Copy email and open Open Times', onclick: function () { copyText(tx); window.open(PAGE_URL, '_blank'); } }),
+          h('button', { class: 'ghost', type: 'button', text: 'Try again', onclick: function () { state.ranges = []; edited(); } })) : null,
+        state.calErr ? h('p', { class: 'small muted', text: 'The email text is copied. In the page, tap the box and paste it. Open the technical details below if you need to send them to Claude.' }) : null));
+      return;
+    }
+
+    var r = checkRequest(req, state.events, ST, nowMs); state.last = r;
+    var word = r.past ? 'PASSED' : r.exact ? (r.ok ? 'FREE' : 'CONFLICT') : (r.ok ? 'OPEN' : 'BOOKED');
+    var reply = replyText(req, r, nowMs);
+    var card = h('div', { class: 'card' }, h('div', { class: 'verdict ' + (r.past ? 'neutral' : r.ok ? 'ok' : 'bad'), text: word }));
+    if (r.past) card.append(h('p', { text: r.exact ? 'That time has already passed.' : 'That day has already passed.' }));
+    else if (r.exact && r.ok) card.append(h('p', { text: 'Nothing on your calendar overlaps.' }));
+    else if (r.exact) r.conflicts.forEach(function (c) { card.append(h('div', { class: 'hit-row', text: (c.ev.allDay ? 'All day' : fmtRange(Math.max(0, (c.ev.start - req.ds) / MIN), Math.min(1440, (c.ev.end - req.ds) / MIN))) + '  ' + c.ev.subject })); });
+    else if (r.ok) card.append(h('div', { class: 'slots' }, r.freeBlocks.map(function (b) { return h('span', { class: 'slot', text: fmtRange(b[0], b[1]) }); })));
+    else card.append(h('p', { text: 'Nothing open for ' + durLabel(req.durMin) + ' then.' }));
+    card.append(h('p', { class: 'suggest-text', text: reply }));
+    var hold = h('input', { type: 'checkbox' }); hold.checked = state.hold; hold.addEventListener('change', function () { state.hold = hold.checked; });
+    card.append(h('div', { class: 'row' },
+      h('button', { class: 'primary', type: 'button', text: 'Reply with this', onclick: function () { openReply(reply); } }),
+      h('button', { class: 'ghost', type: 'button', text: 'Copy', onclick: function () { copyText(reply); } }),
+      r.exact && !r.past ? h('button', { class: 'ghost', type: 'button', text: 'Add to calendar', onclick: function () { openEvent(r, req); } }) : null));
+    if (r.exact && !r.past) card.append(h('label', { class: 'check small' }, hold, 'Mark the new event as a hold'));
+    p.append(card);
+
+    if (!r.ok && r.alts.length) p.append(h('div', { class: 'card' }, h('p', { class: 'sub-h', text: 'Other times' }),
+      h('div', { class: 'slots' }, r.alts.map(function (a) { return h('span', { class: 'slot', text: dayShort(a.ds) + ' ' + fmtRange(a.s, a.s + req.durMin) }); }))));
+
+    var lo = Math.floor(Math.min(ST.startMin, r.exact ? r.s : ST.startMin) / 60) * 60;
+    var hi = Math.min(Math.ceil(Math.max(ST.endMin, r.exact ? r.e : ST.endMin) / 60) * 60, 1440);
+    var list = h('div', { class: 'list' }), hit = new Set(r.conflicts.map(function (c) { return c.ev; }));
+    var rows = r.dayEvs.map(function (e) { var n = evRow(e, req.ds, hit.has(e) ? 'In the way' : ''); if (hit.has(e)) n.classList.add('hit'); return { at: e.allDay ? -1 : Math.max(0, (e.start - req.ds) / MIN), node: n }; });
+    if (r.exact) rows.push({ at: r.s - 0.5, node: h('div', { class: 'ev req' }, h('div', { class: 'ev-time', text: fmtRange(r.s, r.e) }), h('div', { class: 'ev-title', text: 'Requested time' })) });
+    rows.sort(function (a, b) { return a.at - b.at; }).forEach(function (x) { list.append(x.node); });
+    if (!rows.length) list.append(h('p', { class: 'empty', text: 'Nothing scheduled that day.' }));
+    p.append(h('div', { class: 'card' }, h('p', { class: 'sub-h', text: 'Your ' + DOWFULL[new Date(req.ds).getUTCDay()] }),
+      makeBar(r.day, lo, hi, r.exact ? r.s : null, r.exact ? Math.min(r.e, 1440) : null),
+      h('div', { class: 'bar-labels' }, h('span', { text: fmt(lo) }), h('span', { text: fmt(hi) })), list));
+  }
+
+  /* ---- start up ---- */
+  $('reread').addEventListener('click', function () { state.ranges = []; state.events = []; start(); });
+  var ready = false;
+  function boot() {
+    if (ready) return; ready = true;
+    try {
+      var c = Office.context, d = c.diagnostics || {};
+      diag('Outlook ' + (d.hostName || '?') + ' ' + (d.hostVersion || '') + ' on ' + (d.platform || '?'));
+      var sets = ['1.5', '1.8', '1.13'].map(function (v) { return v + ':' + (c.requirements && c.requirements.isSetSupported('Mailbox', v)); });
+      diag('Mailbox sets ' + sets.join('  '));
+      if (c.mailbox && c.mailbox.addHandlerAsync) c.mailbox.addHandlerAsync(Office.EventType.ItemChanged, function () { state.ranges = []; state.events = []; start(); }, function () {});
+    } catch (e) { diag('Setup note: ' + e); }
+    start();
+  }
+  setTimeout(function () { if (!ready) { $('status').textContent = ''; $('panel').append(h('div', { class: 'notice', text: 'This page only works inside Outlook. Open an email in Outlook and tap the Open Times button.' })); } }, 4000);
+  if (window.Office && Office.onReady) Office.onReady(function (info) { if (!info || info.host === Office.HostType.Outlook || info.host == null) boot(); });
+})();
+</script>
+</body>
+</html>
